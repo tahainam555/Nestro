@@ -128,7 +128,7 @@ def generate_mood_board(style: str, room_type: str, color_palette: List[str]) ->
 
     try:
         result = _openai_client().images.generate(
-            model="gpt-image-1",
+            model="dall-e-3",
             prompt=prompt,
             size="1024x1024",
             n=1,

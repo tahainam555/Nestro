@@ -5,6 +5,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from api.routes.auth import get_current_user
 from api.routes.chat import router as chat_router
 from db.connection import get_db
 
@@ -25,8 +26,8 @@ class _ScalarResult:
 
 
 class _FakeSession:
-    def __init__(self, session_id: UUID):
-        self.session_obj = type("SessionObj", (), {"id": session_id})()
+    def __init__(self, session_id: UUID, user_id: UUID):
+        self.session_obj = type("SessionObj", (), {"id": session_id, "user_id": user_id, "status": "active"})()
         self.messages = []
 
     async def execute(self, statement):
@@ -62,12 +63,24 @@ async def test_post_chat_message_returns_200_with_reply(sqlite_session, monkeypa
     app.include_router(chat_router, prefix="/api/v1")
 
     session_id = uuid4()
-    fake_db = _FakeSession(session_id=session_id)
+    user_id = uuid4()
+    fake_db = _FakeSession(session_id=session_id, user_id=user_id)
 
     async def _override_get_db():
         yield fake_db
 
     app.dependency_overrides[get_db] = _override_get_db
+
+    class _FakeUser:
+        id = user_id
+        email = "tester@example.com"
+        name = "Tester"
+        created_at = datetime.now(UTC)
+
+    async def _override_get_current_user():
+        return _FakeUser()
+
+    app.dependency_overrides[get_current_user] = _override_get_current_user
 
     class _FakeIntent:
         def model_dump(self):

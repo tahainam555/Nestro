@@ -18,7 +18,6 @@ from sqlalchemy import text
 from api.routes.auth import router as auth_router
 from api.routes.chat import router as chat_router
 from api.routes.designs import router as designs_router
-from api.routes.health import router as health_router
 from api.routes.sessions import router as sessions_router
 from db.connection import get_db, get_redis
 
@@ -105,6 +104,8 @@ def create_app() -> FastAPI:
 
         if request.url.path.startswith("/api/v1/chat"):
             app.state.chat_limiter._check_request_limit(request, app)  # noqa: SLF001
+        elif request.url.path.startswith("/api/v1"):
+            app.state.limiter._check_request_limit(request, app)  # noqa: SLF001
 
         response = await call_next(request)
         duration_ms = round((time.perf_counter() - start) * 1000, 2)
@@ -132,7 +133,6 @@ def create_app() -> FastAPI:
             content={"detail": "Internal server error"},
         )
 
-    app.include_router(health_router, prefix="/api/v1")
     app.include_router(chat_router, prefix="/api/v1")
     app.include_router(designs_router, prefix="/api/v1")
     app.include_router(auth_router, prefix="/api/v1")

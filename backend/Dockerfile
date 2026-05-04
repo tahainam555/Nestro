@@ -5,10 +5,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY pyproject.toml /app/pyproject.toml
-
+COPY pyproject.toml requirements.txt /app/
 RUN pip install --no-cache-dir --upgrade pip && \
-    python -c "import tomllib, pathlib; d=tomllib.loads(pathlib.Path('pyproject.toml').read_text()); pathlib.Path('requirements.txt').write_text('\\n'.join(d['project']['dependencies']))" && \
     pip install --no-cache-dir -r requirements.txt
 
 COPY . /app

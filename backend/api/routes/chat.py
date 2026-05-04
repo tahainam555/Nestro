@@ -7,12 +7,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.routes.auth import get_current_user
 from core.agent.orchestrator import InteriorDesignerAgent
 from core.nlp.intent_parser import parse_intent
 from core.nlp.vision_processor import analyze_room_image, upload_room_image
 from db.connection import get_db
 from db.models.message import Message, MessageRole
 from db.models.session import Session
+from db.models.user import User
 
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -54,6 +56,7 @@ async def post_message(
     message: str = Form(...),
     image: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ChatResponse:
     if not message.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="message is required")
@@ -66,7 +69,7 @@ async def post_message(
     try:
         session_result = await db.execute(select(Session).where(Session.id == session_uuid))
         session = session_result.scalar_one_or_none()
-        if session is None:
+        if session is None or session.user_id != current_user.id or session.status == "deleted":
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
         image_url: str | None = None
@@ -164,6 +167,7 @@ async def post_message(
 async def get_history(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> HistoryResponse:
     try:
         session_uuid = uuid.UUID(session_id)
@@ -173,7 +177,7 @@ async def get_history(
     try:
         session_result = await db.execute(select(Session).where(Session.id == session_uuid))
         session = session_result.scalar_one_or_none()
-        if session is None:
+        if session is None or session.user_id != current_user.id or session.status == "deleted":
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
         messages_result = await db.execute(

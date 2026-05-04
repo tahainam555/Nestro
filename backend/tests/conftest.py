@@ -1,9 +1,16 @@
 from collections.abc import AsyncGenerator
+import os
 
 import pytest
 import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+
+os.environ.setdefault("REDIS_URL", "memory://")
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("JWT_SECRET", "test-secret")
+os.environ.setdefault("ALLOWED_ORIGINS", "*")
 
 
 @pytest.fixture
