@@ -1,13 +1,76 @@
 services:
-  backend:
+  app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: nestro-backend
+    container_name: nestro-app
     env_file:
       - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/nestro
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+
+  postgres:
+    image: postgres:16
+    container_name: nestro-postgres
+    environment:
+      POSTGRES_DB: nestro
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
     volumes:
-      - .:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nestro"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: nestro-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  db-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nestro-db-init
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/nestro
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "
+      alembic upgrade head &&
+      python -c 'import asyncio; from core.nlp.style_retriever import seed_style_knowledge_base; asyncio.run(seed_style_knowledge_base())'
+      "
+
+volumes:
+  postgres_data:
+  redis_data:
