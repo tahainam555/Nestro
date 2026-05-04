@@ -15,7 +15,7 @@ from db.models.session import Session
 from db.models.user import User
 
 
-router = APIRouter(prefix="/api/v1", tags=["designs"])
+router = APIRouter(tags=["designs"])
 
 
 class CreateDesignRequest(BaseModel):

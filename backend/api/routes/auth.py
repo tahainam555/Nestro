@@ -13,7 +13,7 @@ from db.connection import get_db
 from db.models.user import User
 
 
-router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer(auto_error=False)
 
 JWT_ALGORITHM = "HS256"

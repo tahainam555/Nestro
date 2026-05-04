@@ -15,7 +15,7 @@ from db.models.message import Message, MessageRole
 from db.models.session import Session
 
 
-router = APIRouter(prefix="/api/v1/chat", tags=["chat"])
+router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 class ChatResponse(BaseModel):

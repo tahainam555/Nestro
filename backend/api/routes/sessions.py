@@ -14,7 +14,7 @@ from db.models.session import Session
 from db.models.user import User
 
 
-router = APIRouter(prefix="/api/v1", tags=["sessions"])
+router = APIRouter(tags=["sessions"])
 
 
 class CreateSessionResponse(BaseModel):
