@@ -1,0 +1,18 @@
+[
+  {
+    "id": "minimalist-living",
+    "style_name": "Minimalist",
+    "description": "Clean lines, uncluttered surfaces, neutral base tones, and functional furniture.",
+    "color_palette": ["white", "beige", "charcoal"],
+    "furniture_types": ["low-profile sofa", "open shelving", "simple coffee table"],
+    "example_rooms": ["living room", "studio apartment"]
+  },
+  {
+    "id": "boho-bedroom",
+    "style_name": "Bohemian",
+    "description": "Layered textiles, natural materials, warm earthy accents, and eclectic decor.",
+    "color_palette": ["terracotta", "olive", "cream"],
+    "furniture_types": ["rattan chair", "wood bed frame", "woven rug"],
+    "example_rooms": ["bedroom", "reading nook"]
+  }
+]

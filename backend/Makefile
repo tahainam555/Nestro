@@ -1,25 +1,13 @@
-.PHONY: install install-dev run test lint format docker-up docker-down
+.PHONY: dev test migrate seed
 
-install:
-	pip install .
-
-install-dev:
-	pip install -e ".[dev]"
-
-run:
-	uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+dev:
+	docker compose up --build
 
 test:
 	pytest -q
 
-lint:
-	ruff check .
+migrate:
+	alembic upgrade head
 
-format:
-	ruff format .
-
-docker-up:
-	docker compose up --build
-
-docker-down:
-	docker compose down
+seed:
+	python -c "import asyncio; from core.nlp.style_retriever import seed_style_knowledge_base; asyncio.run(seed_style_knowledge_base())"
