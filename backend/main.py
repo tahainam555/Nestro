@@ -14,6 +14,7 @@ from slowapi.extension import _rate_limit_exceeded_handler
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 from sqlalchemy import text
+from redis import Redis
 
 from api.routes.auth import router as auth_router
 from api.routes.chat import router as chat_router
@@ -35,13 +36,34 @@ logger = structlog.get_logger("nestro.api")
 
 
 def _parse_allowed_origins() -> list[str]:
-    raw = os.getenv("ALLOWED_ORIGINS", "*")
+    raw = os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173",
+    )
     origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
     return origins or ["*"]
 
 
 def _jwt_secret() -> str | None:
     return os.getenv("JWT_SECRET")
+
+
+def _resolve_limiter_storage_uri() -> str:
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+    try:
+        client = Redis.from_url(
+            redis_url,
+            socket_connect_timeout=1,
+            socket_timeout=1,
+            health_check_interval=0,
+        )
+        client.ping()
+        client.close()
+        return redis_url
+    except Exception:
+        logger.warning("redis_unavailable_falling_back_to_memory_limiter", redis_url=redis_url)
+        return "memory://"
 
 
 def _extract_user_id_from_request(request: Request) -> str | None:
@@ -71,17 +93,17 @@ def create_app() -> FastAPI:
         description="Core API service for Nestro.",
     )
 
-    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    limiter_storage_uri = _resolve_limiter_storage_uri()
 
     default_limiter = Limiter(
         key_func=get_remote_address,
         default_limits=["100/minute"],
-        storage_uri=redis_url,
+        storage_uri=limiter_storage_uri,
     )
     chat_limiter = Limiter(
         key_func=get_remote_address,
         default_limits=["10/minute"],
-        storage_uri=redis_url,
+        storage_uri=limiter_storage_uri,
     )
 
     app.state.limiter = default_limiter
@@ -169,3 +191,14 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "main:app",
+        host=os.getenv("HOST", "0.0.0.0"),
+        port=int(os.getenv("PORT", "8000")),
+        reload=os.getenv("RELOAD", "false").lower() == "true",
+    )
