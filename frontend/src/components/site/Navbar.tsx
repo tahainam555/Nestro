@@ -21,7 +21,7 @@ export const Navbar = () => {
           className="flex items-center gap-2 font-display text-2xl tracking-tight hover:opacity-80 transition-opacity"
         >
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-primary" />
-          maison<span className="italic text-primary">.</span>
+          atelier<span className="italic text-primary">.</span>
         </a>
         <ul className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
           {links.map((l) => (

@@ -351,8 +351,8 @@ const Index = () => {
 
       <footer className="border-t border-border/60 py-10">
         <div className="container flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <p className="font-display text-lg text-foreground">maison<span className="italic text-muted-foreground">.</span></p>
-          <p>© 2026 Maison Studio · Designed with quiet care.</p>
+          <p className="font-display text-lg text-foreground">atelier<span className="italic text-muted-foreground">.</span></p>
+          <p>© 2026 Atelier Studio · Designed with quiet care.</p>
         </div>
       </footer>
           </main>

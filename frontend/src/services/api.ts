@@ -3,7 +3,17 @@
  * Handles all backend communication for the Nestro application
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000").replace(/\/$/, "");
+const API_PREFIX = "/api/v1";
+const MOCK_LATENCY_MS = 450;
+
+const apiUrl = (endpoint: string) => {
+  const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  if (path === "/health" || path.startsWith(API_PREFIX)) {
+    return `${API_BASE_URL}${path}`;
+  }
+  return `${API_BASE_URL}${API_PREFIX}${path}`;
+};
 
 /**
  * API Response wrapper for consistent error handling
@@ -46,11 +56,11 @@ async function apiRequest<T>(
       options.body = JSON.stringify(body);
     }
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+    const response = await fetch(apiUrl(endpoint), options);
 
     // Handle successful responses
     if (response.ok) {
-      const data = await response.json();
+      const data = response.status === 204 ? null : await response.json();
       return {
         success: true,
         data,
@@ -122,10 +132,10 @@ async function apiRequestMultipart<T>(
       body: formData,
     };
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+    const response = await fetch(apiUrl(endpoint), options);
 
     if (response.ok) {
-      const data = await response.json();
+      const data = response.status === 204 ? null : await response.json();
       return {
         success: true,
         data,
@@ -161,7 +171,39 @@ async function apiRequestMultipart<T>(
  */
 export async function checkHealth(): Promise<boolean> {
   const response = await apiRequest<{ status: string }>('GET', '/health', undefined, false);
-  return response.success && response.data?.status === "ok";
+  return response.success && ["ok", "degraded"].includes(response.data?.status || "");
+}
+
+const mockDelay = () => new Promise((resolve) => setTimeout(resolve, MOCK_LATENCY_MS));
+
+function shouldUseMock(response: ApiResponse<unknown>): boolean {
+  return response.status === 0 || response.status >= 500;
+}
+
+function mockToken(email: string): AuthResponse {
+  return {
+    access_token: `mock-token-${btoa(email).replace(/=+$/, "")}-${Date.now()}`,
+    token_type: "bearer",
+    expires_in: 24 * 60 * 60,
+  };
+}
+
+function storedMockUser(): UserResponse | null {
+  const raw = localStorage.getItem("mock_user");
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as UserResponse;
+  } catch {
+    return null;
+  }
+}
+
+function saveMockUser(user: UserResponse): void {
+  localStorage.setItem("mock_user", JSON.stringify(user));
+}
+
+function mockResponse<T>(data: T, status = 200): ApiResponse<T> {
+  return { success: true, data, status };
 }
 
 /**
@@ -193,15 +235,43 @@ export interface UserResponse {
 }
 
 export async function register(payload: RegisterPayload): Promise<ApiResponse<AuthResponse>> {
-  return apiRequest<AuthResponse>('POST', '/auth/register', payload, false);
+  const response = await apiRequest<AuthResponse>('POST', '/auth/register', payload, false);
+  if (!shouldUseMock(response)) return response;
+
+  await mockDelay();
+  saveMockUser({
+    id: crypto.randomUUID(),
+    email: payload.email,
+    name: payload.name,
+    created_at: new Date().toISOString(),
+  });
+  return mockResponse(mockToken(payload.email), 201);
 }
 
 export async function login(payload: LoginPayload): Promise<ApiResponse<AuthResponse>> {
-  return apiRequest<AuthResponse>('POST', '/auth/login', payload, false);
+  const response = await apiRequest<AuthResponse>('POST', '/auth/login', payload, false);
+  if (!shouldUseMock(response)) return response;
+
+  await mockDelay();
+  const user = storedMockUser() || {
+    id: crypto.randomUUID(),
+    email: payload.email,
+    name: payload.email.split("@")[0] || "Nestro User",
+    created_at: new Date().toISOString(),
+  };
+  saveMockUser(user);
+  return mockResponse(mockToken(payload.email));
 }
 
 export async function getCurrentUser(): Promise<ApiResponse<UserResponse>> {
-  return apiRequest<UserResponse>('GET', '/auth/me');
+  const response = await apiRequest<UserResponse>('GET', '/auth/me');
+  if (!shouldUseMock(response)) return response;
+
+  await mockDelay();
+  const user = storedMockUser();
+  return user
+    ? mockResponse(user)
+    : { success: false, error: "No signed-in user found", status: 401 };
 }
 
 /**
@@ -225,7 +295,14 @@ export interface SessionsListResponse {
 }
 
 export async function createSession(): Promise<ApiResponse<CreateSessionResponse>> {
-  return apiRequest<CreateSessionResponse>('POST', '/sessions');
+  const response = await apiRequest<CreateSessionResponse>('POST', '/sessions');
+  if (!shouldUseMock(response)) return response;
+
+  await mockDelay();
+  return mockResponse({
+    session_id: crypto.randomUUID(),
+    created_at: new Date().toISOString(),
+  }, 201);
 }
 
 export async function listSessions(): Promise<ApiResponse<SessionsListResponse>> {
@@ -274,11 +351,25 @@ export async function sendMessage(
     formData.append('image', image);
   }
 
-  return apiRequestMultipart<ChatResponse>('POST', '/chat/message', formData);
+  const response = await apiRequestMultipart<ChatResponse>('POST', '/chat/message', formData);
+  if (!shouldUseMock(response)) return response;
+
+  await mockDelay();
+  return mockResponse({
+    session_id: sessionId,
+    reply: "Brief received. I have enough context to analyze the room, style direction, budget, and product fit.",
+    tools_used: ["mock_intent_parser", "mock_design_agent"],
+    design_plan: {
+      budget_range: "mid",
+      notes: message,
+    },
+    products: [],
+    created_at: new Date().toISOString(),
+  });
 }
 
 export async function getChatHistory(sessionId: string): Promise<ApiResponse<HistoryResponse>> {
-  return apiRequest<HistoryResponse>('GET', `/chat/history?session_id=${sessionId}`);
+  return apiRequest<HistoryResponse>('GET', `/chat/history/${encodeURIComponent(sessionId)}`);
 }
 
 /**
@@ -329,19 +420,61 @@ export interface SavedProductsGroupedResponse {
 }
 
 export async function createDesign(payload: CreateDesignRequest): Promise<ApiResponse<DesignResponse>> {
-  return apiRequest<DesignResponse>('POST', '/designs', payload);
+  const response = await apiRequest<DesignResponse>('POST', '/designs', payload);
+  if (!shouldUseMock(response)) return response;
+
+  await mockDelay();
+  return mockResponse({
+    id: crypto.randomUUID(),
+    session_id: payload.session_id,
+    room_type: payload.room_type,
+    style: payload.style,
+    budget: payload.budget,
+    layout_json: payload.layout_json,
+    mood_board_url: payload.mood_board_url || null,
+    created_at: new Date().toISOString(),
+  }, 201);
 }
 
 export async function saveProduct(payload: SaveProductRequest): Promise<ApiResponse<SavedProductResponse>> {
-  return apiRequest<SavedProductResponse>('POST', '/designs/products', payload);
+  const response = await apiRequest<SavedProductResponse>('POST', '/products/save', payload);
+  if (!shouldUseMock(response)) return response;
+
+  await mockDelay();
+  const saved = {
+    id: crypto.randomUUID(),
+    ...payload,
+    image_url: payload.image_url || null,
+    category: payload.category || null,
+  };
+  const current = JSON.parse(localStorage.getItem("mock_saved_products") || "[]") as SavedProductResponse[];
+  localStorage.setItem("mock_saved_products", JSON.stringify([...current, saved]));
+  return mockResponse(saved, 201);
 }
 
 export async function getSavedProducts(): Promise<ApiResponse<SavedProductsGroupedResponse>> {
-  return apiRequest<SavedProductsGroupedResponse>('GET', '/designs/products');
+  const response = await apiRequest<SavedProductsGroupedResponse>('GET', '/products/saved');
+  if (!shouldUseMock(response)) return response;
+
+  await mockDelay();
+  const current = JSON.parse(localStorage.getItem("mock_saved_products") || "[]") as SavedProductResponse[];
+  const grouped_products = current.reduce<Record<string, SavedProductResponse[]>>((groups, product) => {
+    const key = product.category || "uncategorized";
+    groups[key] = [...(groups[key] || []), product];
+    return groups;
+  }, {});
+  return mockResponse({ grouped_products });
 }
 
 export async function removeSavedProduct(productId: string): Promise<ApiResponse<{ product_id: string; removed_count: number }>> {
-  return apiRequest('DELETE', `/designs/products/${productId}`);
+  const response = await apiRequest<{ product_id: string; removed_count: number }>('DELETE', `/products/saved/${productId}`);
+  if (!shouldUseMock(response)) return response;
+
+  await mockDelay();
+  const current = JSON.parse(localStorage.getItem("mock_saved_products") || "[]") as SavedProductResponse[];
+  const next = current.filter((product) => product.product_id !== productId);
+  localStorage.setItem("mock_saved_products", JSON.stringify(next));
+  return mockResponse({ product_id: productId, removed_count: current.length - next.length });
 }
 
 /**

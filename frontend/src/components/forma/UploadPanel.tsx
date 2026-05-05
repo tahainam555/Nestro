@@ -3,13 +3,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useForma } from "@/store/forma";
 import sampleRoom from "@/assets/sample-room.jpg";
-
-  const [analysisTags, setAnalysisTags] = useState<string[]>([]);
+import { generateMockRoomAnalysisTags } from "@/services/mock";
 
 export function UploadPanel() {
   const navigate = useNavigate();
   const { uploadedImage, setUploaded, setAnalysisDone, analysisDone } = useForma();
   const [scanning, setScanning] = useState(false);
+  const [analysisTags, setAnalysisTags] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (file: File) => {
@@ -21,19 +21,10 @@ export function UploadPanel() {
   const runScan = () => {
     setScanning(true);
     setTimeout(() => {
+      setAnalysisTags(generateMockRoomAnalysisTags());
       setScanning(false);
       setAnalysisDone(true);
     }, 1800);
-    const runScan = () => {
-      setScanning(true);
-      // Simulate image analysis
-      setTimeout(() => {
-        // Generate mock analysis tags
-        const tags = generateMockRoomAnalysisTags();
-        setAnalysisTags(tags);
-        setScanning(false);
-        setAnalysisDone(true);
-      }, 1800);
   };
 
   const useSample = () => {

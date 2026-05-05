@@ -2,7 +2,13 @@ import type { Config } from "tailwindcss";
 
 export default {
   darkMode: ["class"],
-  content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  content: [
+    // Project root files
+    "./index.html",
+    // Frontend sources (monorepo-style frontend/ folder)
+    "./frontend/src/**/*.{js,ts,jsx,tsx}",
+    "./frontend/**/*.{html,js,ts,jsx,tsx}",
+  ],
   prefix: "",
   theme: {
     container: { center: true, padding: "1.5rem", screens: { "2xl": "1400px" } },
