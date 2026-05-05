@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useForma } from "@/store/forma";
 import sampleRoom from "@/assets/sample-room.jpg";
 
-const ANALYSIS_TAGS = ["SOFA", "SHELF", "TABLE", "PLANT", "WINDOW", "WOOD FLOOR"];
+  const [analysisTags, setAnalysisTags] = useState<string[]>([]);
 
 export function UploadPanel() {
   const navigate = useNavigate();
@@ -24,6 +24,16 @@ export function UploadPanel() {
       setScanning(false);
       setAnalysisDone(true);
     }, 1800);
+    const runScan = () => {
+      setScanning(true);
+      // Simulate image analysis
+      setTimeout(() => {
+        // Generate mock analysis tags
+        const tags = generateMockRoomAnalysisTags();
+        setAnalysisTags(tags);
+        setScanning(false);
+        setAnalysisDone(true);
+      }, 1800);
   };
 
   const useSample = () => {
@@ -137,7 +147,7 @@ export function UploadPanel() {
                 animate="show"
                 variants={{ show: { transition: { staggerChildren: 0.08 } } }}
               >
-                {ANALYSIS_TAGS.map((t) => (
+                {analysisTags.map((t) => (
                   <motion.span
                     key={t}
                     variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
@@ -157,8 +167,10 @@ export function UploadPanel() {
 
           <div className="mt-6 flex items-center gap-3">
             <button
-              onClick={() => useForma.getState().setUploaded(null)}
-              className="rounded-sm border px-4 py-2 font-mono text-[10px] tracking-[0.25em]"
+              onClick={() => {
+                useForma.getState().setUploaded(null);
+                setAnalysisTags([]);
+              }}
               style={{ borderColor: "var(--border-c)", color: "hsl(var(--foreground))" }}
             >
               REPLACE

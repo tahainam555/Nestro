@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { products } from "./data";
 import { useForma, type Product } from "@/store/forma";
+import { useToast } from "@/hooks/use-toast";
+import { saveProduct } from "@/services/api";
 
 const CATS = ["All", "Seating", "Tables", "Lighting", "Textiles", "Decor", "Storage"];
 
@@ -116,6 +118,45 @@ export function ProductsPanel() {
 }
 
 function ProductDrawer({ product, onClose }: { product: Product; onClose: () => void }) {
+  const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveProduct = async () => {
+    setIsSaving(true);
+    try {
+      const response = await saveProduct({
+        product_id: product.id,
+        name: product.name,
+        price: product.price,
+        url: `https://example.com/product/${product.id}`, // Placeholder URL
+        image_url: product.image,
+        category: product.category,
+      });
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: `${product.name} added to your mood board!`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to save product",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "An error occurred";
+      toast({
+        title: "Error",
+        description: errorMsg,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <motion.aside
       initial={{ x: "100%" }}
@@ -185,10 +226,12 @@ function ProductDrawer({ product, onClose }: { product: Product; onClose: () => 
         </dl>
 
         <button
-          className="hard-shadow mt-6 w-full rounded-sm py-3 font-mono text-[10px] tracking-[0.3em]"
+          onClick={handleSaveProduct}
+          disabled={isSaving}
+          className="hard-shadow mt-6 w-full rounded-sm py-3 font-mono text-[10px] tracking-[0.3em] disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ background: "hsl(var(--primary))", color: "hsl(var(--background))" }}
         >
-          ADD TO MOOD BOARD
+          {isSaving ? "SAVING..." : "ADD TO MOOD BOARD"}
         </button>
       </div>
     </motion.aside>

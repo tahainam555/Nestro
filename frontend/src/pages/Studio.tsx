@@ -1,10 +1,44 @@
-import { Outlet } from "react-router-dom";
+import { useEffect } from "react";
+import { Outlet, useNavigate } from "react-router-dom";
 import { AppSidebar } from "@/components/site/AppSidebar";
 import { ThemeToggle } from "@/components/site/ThemeToggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { useForma } from "@/store/forma";
+import { createSession, isAuthenticated } from "@/services/api";
 
 export default function Studio() {
+  const navigate = useNavigate();
+  const { currentSessionId, setCurrentSessionId } = useForma();
+
+  useEffect(() => {
+    // Check authentication and create a session if needed
+    const initializeSession = async () => {
+      // If already authenticated and has a session, don't create a new one
+      if (currentSessionId) {
+        return;
+      }
+
+      // If not authenticated, redirect to signin
+      if (!isAuthenticated()) {
+        navigate("/signin");
+        return;
+      }
+
+      // Create a new session
+      try {
+        const response = await createSession();
+        if (response.success && response.data) {
+          setCurrentSessionId(response.data.session_id);
+        }
+      } catch (error) {
+        console.error("Failed to create session:", error);
+      }
+    };
+
+    initializeSession();
+  }, [currentSessionId, setCurrentSessionId, navigate]);
+
   return (
     <SidebarProvider>
       <div className="h-screen flex w-full bg-background text-foreground overflow-hidden dark:bg-background">
@@ -21,11 +55,20 @@ export default function Studio() {
             </div>
             <div className="flex items-center gap-3">
               <ThemeToggle />
-              <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="hidden sm:inline-flex"
+                onClick={() => navigate("/signin")}
+              >
                 Sign in
               </Button>
-              <Button variant="clay" size="sm" asChild>
-                <a href="/upload">Start designing</a>
+              <Button 
+                variant="clay" 
+                size="sm"
+                onClick={() => navigate("/upload")}
+              >
+                Start designing
               </Button>
             </div>
           </header>

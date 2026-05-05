@@ -1,10 +1,100 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForma } from "@/store/forma";
+import { useToast } from "@/hooks/use-toast";
+import { sendMessage } from "@/services/api";
 import { styles } from "./data";
 
 export function BriefPanel() {
   const navigate = useNavigate();
-  const { brief, setBrief, selectedStyle, setSelectedStyle } = useForma();
+  const { toast } = useToast();
+  const { 
+    brief, 
+    setBrief, 
+    selectedStyle, 
+    setSelectedStyle,
+    currentSessionId,
+    setDesignBriefData,
+    uploadedImage,
+  } = useForma();
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleContinue = async () => {
+    if (!brief.trim()) {
+      toast({
+        title: "Brief Required",
+        description: "Please describe your design vision before continuing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedStyle) {
+      toast({
+        title: "Style Required",
+        description: "Please select a style direction before continuing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!currentSessionId) {
+      toast({
+        title: "Error",
+        description: "Session not initialized. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Prepare the design brief data
+      const designBriefData = {
+        roomType: "living-room", // TODO: Allow user to select this
+        style: selectedStyle,
+        budget: 5000, // TODO: Allow user to input this
+        brief: brief,
+        layoutJson: {},
+        moodBoardUrl: uploadedImage || undefined,
+      };
+
+      // Save to store
+      setDesignBriefData(designBriefData);
+
+      // Send design brief as a message to the backend
+      const messageContent = `Design Brief: ${brief}\n\nPreferred Style: ${selectedStyle}`;
+      
+      const response = await sendMessage(currentSessionId, messageContent);
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Design brief submitted. Moving to analysis...",
+        });
+        
+        // Navigate to analysis
+        navigate("/analysis");
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to submit design brief.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "An error occurred";
+      toast({
+        title: "Error",
+        description: errorMsg,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="mx-auto w-full max-w-5xl">
@@ -36,6 +126,7 @@ export function BriefPanel() {
           placeholder="Earthy, organic, connecting nature to interior..."
           className="mt-3 w-full resize-none bg-transparent font-display italic text-lg outline-none placeholder:opacity-50"
           style={{ color: "hsl(var(--foreground))" }}
+          disabled={isSubmitting}
         />
         <div
           className="mt-3 flex items-center justify-between font-mono text-[10px] tracking-[0.3em]"
@@ -63,8 +154,9 @@ export function BriefPanel() {
             return (
               <button
                 key={s.id}
-                onClick={() => setSelectedStyle(active ? null : s.id)}
-                className="group relative overflow-hidden text-left transition-all duration-300 hover:-translate-y-1"
+                onClick={() => !isSubmitting && setSelectedStyle(active ? null : s.id)}
+                disabled={isSubmitting}
+                className="group relative overflow-hidden text-left transition-all duration-300 hover:-translate-y-1 disabled:opacity-50"
                 style={{
                   background: "var(--surface)",
                   borderLeft: active
@@ -101,11 +193,12 @@ export function BriefPanel() {
       {/* Continue CTA */}
       <div className="mt-8 flex justify-end">
         <button
-          onClick={() => navigate("/analysis")}
-          className="hard-shadow rounded-sm px-5 py-3 font-mono text-[10px] tracking-[0.25em]"
+          onClick={handleContinue}
+          disabled={isSubmitting}
+          className="hard-shadow rounded-sm px-5 py-3 font-mono text-[10px] tracking-[0.25em] disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ background: "hsl(var(--primary))", color: "hsl(var(--background))" }}
         >
-          CONTINUE TO ANALYSIS →
+          {isSubmitting ? "SUBMITTING..." : "CONTINUE TO ANALYSIS →"}
         </button>
       </div>
     </div>

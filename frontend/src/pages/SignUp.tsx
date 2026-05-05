@@ -3,12 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { useForma } from "@/store/forma";
+import { register, setAuthToken } from "@/services/api";
 
 export const SignUp = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { setAuthToken: setStoreToken, setUser, setIsAuthenticated } = useForma();
+  
   const [formData, setFormData] = useState({ name: "", email: "", password: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -35,25 +42,60 @@ export const SignUp = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setGeneralError(null);
     
     if (!validateForm()) return;
     
     setIsSubmitting(true);
     
-    // Simulate signup (in real app, this would call backend API)
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    
-    // Store basic auth state (you can enhance this later with real JWT)
-    localStorage.setItem("user", JSON.stringify({ 
-      name: formData.name,
-      email: formData.email 
-    }));
-    localStorage.setItem("isAuthenticated", "true");
-    
-    setIsSubmitting(false);
-    
-    // Redirect to /overview
-    navigate("/overview");
+    try {
+      // Call backend registration API
+      const response = await register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+      });
+      
+      if (response.success && response.data) {
+        // Store token
+        setAuthToken(response.data.access_token);
+        setStoreToken(response.data.access_token);
+        setIsAuthenticated(true);
+        
+        // Store user info
+        setUser({
+          id: "",
+          email: formData.email,
+          name: formData.name,
+          created_at: new Date().toISOString(),
+        });
+        
+        toast({
+          title: "Success",
+          description: "Your account has been created successfully!",
+        });
+        
+        // Redirect to /overview
+        navigate("/overview");
+      } else {
+        setGeneralError(response.error || "Registration failed. Please try again.");
+        toast({
+          title: "Error",
+          description: response.error || "Registration failed",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "An unexpected error occurred";
+      setGeneralError(errorMsg);
+      toast({
+        title: "Error",
+        description: errorMsg,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,6 +134,13 @@ export const SignUp = () => {
                 Get started designing your interior spaces today
               </p>
             </div>
+
+            {/* General Error Message */}
+            {generalError && (
+              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                <p className="text-sm text-destructive">{generalError}</p>
+              </div>
+            )}
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">

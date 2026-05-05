@@ -3,13 +3,20 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { useForma } from "@/store/forma";
+import { login, setAuthToken } from "@/services/api";
 
 export const SignIn = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
+  const { setAuthToken: setStoreToken, setUser, setIsAuthenticated } = useForma();
+  
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -32,23 +39,60 @@ export const SignIn = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setGeneralError(null);
     
     if (!validateForm()) return;
     
     setIsSubmitting(true);
     
-    // Simulate login (in real app, this would call backend API)
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    
-    // Store basic auth state (you can enhance this later with real JWT)
-    localStorage.setItem("user", JSON.stringify({ email: formData.email }));
-    localStorage.setItem("isAuthenticated", "true");
-    
-    setIsSubmitting(false);
-    
-    // Redirect to /overview or the page they came from
-    const from = (location.state as any)?.from?.pathname || "/overview";
-    navigate(from);
+    try {
+      // Call backend login API
+      const response = await login({
+        email: formData.email,
+        password: formData.password,
+      });
+      
+      if (response.success && response.data) {
+        // Store token
+        setAuthToken(response.data.access_token);
+        setStoreToken(response.data.access_token);
+        setIsAuthenticated(true);
+        
+        // Optionally fetch user info and store it
+        setUser({
+          id: "",
+          email: formData.email,
+          name: "",
+          created_at: new Date().toISOString(),
+        });
+        
+        toast({
+          title: "Success",
+          description: "You've been signed in successfully!",
+        });
+        
+        // Redirect to /overview or the page they came from
+        const from = (location.state as any)?.from?.pathname || "/overview";
+        navigate(from);
+      } else {
+        setGeneralError(response.error || "Login failed. Please try again.");
+        toast({
+          title: "Error",
+          description: response.error || "Login failed",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "An unexpected error occurred";
+      setGeneralError(errorMsg);
+      toast({
+        title: "Error",
+        description: errorMsg,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,6 +131,13 @@ export const SignIn = () => {
                 Sign in to your account to continue designing
               </p>
             </div>
+
+            {/* General Error Message */}
+            {generalError && (
+              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                <p className="text-sm text-destructive">{generalError}</p>
+              </div>
+            )}
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
